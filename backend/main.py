@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 from pydantic import BaseModel
 from typing import Optional, List
-import getpass
+import os
+from dotenv import load_dotenv
 
 # Candidate Schema (Pydantic)
 class Candidate(BaseModel):
@@ -26,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_PASSWORD = getpass.getpass("Enter MySQL password: ")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "your_default_password")
 
 # Database connection
 def get_db_connection():
