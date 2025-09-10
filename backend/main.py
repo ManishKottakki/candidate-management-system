@@ -1,27 +1,15 @@
-
-# backend/main.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 from pydantic import BaseModel
-from typing import Optional, List
 import getpass
 
-# Candidate Schema (Pydantic)
-class Candidate(BaseModel):
-    name: str
-    email: str
-    phone_number: Optional[str]
-    current_status: Optional[str]
-    resume_link: Optional[str]
-
-# Initialize app
 app = FastAPI()
 
-# Allow front-end (React) to connect
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or restrict to ["http://localhost:3000"] for React
+    allow_origins=["*"],  # You can restrict this to ["http://localhost:3000"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,7 +17,7 @@ app.add_middleware(
 
 DB_PASSWORD = getpass.getpass("Enter MySQL password: ")
 
-# Database connection
+# Database connection function
 def get_db_connection():
     return mysql.connector.connect(
         host="localhost",
@@ -39,65 +27,58 @@ def get_db_connection():
         port=3306
     )
 
-# -------------------------------
-# CRUD Endpoints
-# -------------------------------
+# Candidate model
+class Candidate(BaseModel):
+    name: str
+    email: str
+    phone_number: int
+    current_status: str
+    resume_link: str
 
-# Read (GET all candidates)
+# ------------------ Routes ------------------
+
+# Get all candidates
 @app.get("/api/candidates")
 def get_candidates():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
     cursor.execute("SELECT * FROM candidates")
-    candidates = cursor.fetchall()
-    cursor.close()
+    rows = cursor.fetchall()
     conn.close()
-    return candidates
+    return rows
 
-# Create (POST a new candidate)
+# Add new candidate
 @app.post("/api/candidates")
 def add_candidate(candidate: Candidate):
     conn = get_db_connection()
     cursor = conn.cursor()
-    sql = """
-        INSERT INTO candidates (name, email, phone_number, current_status, resume_link)
-        VALUES (%s, %s, %s, %s, %s)
-    """
-    values = (candidate.name, candidate.email, candidate.phone_number,
-              candidate.current_status, candidate.resume_link)
-    cursor.execute(sql, values)
+    cursor.execute(
+        "INSERT INTO candidates (name, email, phone_number, current_status, resume_link) VALUES (%s, %s, %s, %s, %s)",
+        (candidate.name, candidate.email, candidate.phone_number, candidate.current_status, candidate.resume_link),
+    )
     conn.commit()
-    candidate_id = cursor.lastrowid
-    cursor.close()
     conn.close()
-    return {"message": "Candidate added successfully", "id": candidate_id}
+    return {"message": "Candidate added successfully"}
 
-# Update (PUT a candidate by ID)
-@app.put("/api/candidates/{id}")
-def update_candidate(id: int, candidate: Candidate):
+# Update candidate
+@app.put("/api/candidates/{candidate_id}")
+def update_candidate(candidate_id: int, candidate: Candidate):
     conn = get_db_connection()
     cursor = conn.cursor()
-    sql = """
-        UPDATE candidates
-        SET name=%s, email=%s, phone_number=%s, current_status=%s, resume_link=%s
-        WHERE id=%s
-    """
-    values = (candidate.name, candidate.email, candidate.phone_number,
-              candidate.current_status, candidate.resume_link, id)
-    cursor.execute(sql, values)
+    cursor.execute(
+        "UPDATE candidates SET name=%s, email=%s, phone_number=%s, current_status=%s, resume_link=%s WHERE id=%s",
+        (candidate.name, candidate.email, candidate.phone_number, candidate.current_status, candidate.resume_link, candidate_id),
+    )
     conn.commit()
-    cursor.close()
     conn.close()
-    return {"message": f"Candidate {id} updated successfully"}
+    return {"message": "Candidate updated successfully"}
 
-# Delete (DELETE a candidate by ID)
-@app.delete("/api/candidates/{id}")
-def delete_candidate(id: int):
+# Delete candidate
+@app.delete("/api/candidates/{candidate_id}")
+def delete_candidate(candidate_id: int):
     conn = get_db_connection()
     cursor = conn.cursor()
-    sql = "DELETE FROM candidates WHERE id=%s"
-    cursor.execute(sql, (id,))
+    cursor.execute("DELETE FROM candidates WHERE id=%s", (candidate_id,))
     conn.commit()
-    cursor.close()
     conn.close()
-    return {"message": f"Candidate {id} deleted successfully"}
+    return {"message": "Candidate deleted successfully"}

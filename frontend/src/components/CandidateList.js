@@ -1,35 +1,90 @@
+import React, { useEffect, useState } from "react";
+import CandidateForm from "./CandidateForm";
 
-import { useEffect, useState } from "react";
-import { getCandidates, deleteCandidate } from "../services/api";
+const API_URL = "http://127.0.0.1:8000/api/candidates";
 
-export default function CandidateList() {
+function CandidateList() {
   const [candidates, setCandidates] = useState([]);
+  const [editingCandidate, setEditingCandidate] = useState(null);
+
+  // Fetch candidates
+  const fetchCandidates = async () => {
+    const response = await fetch(API_URL);
+    const data = await response.json();
+    setCandidates(data);
+  };
 
   useEffect(() => {
     fetchCandidates();
   }, []);
 
-  const fetchCandidates = async () => {
-    const res = await getCandidates();
-    setCandidates(res.data);
+  // Delete candidate
+  const handleDelete = async (id) => {
+    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
+    fetchCandidates();
   };
 
-  const handleDelete = async (id) => {
-    await deleteCandidate(id);
-    fetchCandidates(); // refresh list
+  // Edit candidate
+  const handleEdit = (candidate) => {
+    setEditingCandidate(candidate);
+  };
+
+  // Handle form submit (for both add & edit)
+  const handleFormSubmit = async (candidate) => {
+    if (editingCandidate) {
+      // update
+      await fetch(`${API_URL}/${editingCandidate.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(candidate),
+      });
+    } else {
+      // add new
+      await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(candidate),
+      });
+    }
+    setEditingCandidate(null);
+    fetchCandidates();
   };
 
   return (
     <div>
       <h2>Candidate List</h2>
-      <ul>
-        {candidates.map((c) => (
-          <li key={c.id}>
-            {c.name} | {c.email} | {c.current_status}
-            <button onClick={() => handleDelete(c.id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
+      <CandidateForm onSubmit={handleFormSubmit} editingCandidate={editingCandidate} />
+      <table border="1" style={{ width: "100%", marginTop: "20px" }}>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Phone Number</th>
+            <th>Current Status</th>
+            <th>Resume Link</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {candidates.map((c) => (
+            <tr key={c.id}>
+              <td>{c.id}</td>
+              <td>{c.name}</td>
+              <td>{c.email}</td>
+              <td>{c.phone_number}</td>
+              <td>{c.current_status}</td>
+              <td>{c.resume_link}</td>
+              <td>
+                <button onClick={() => handleEdit(c)}>Edit</button>
+                <button onClick={() => handleDelete(c.id)}>Delete</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
+
+export default CandidateList;
