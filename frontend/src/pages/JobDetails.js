@@ -9,6 +9,7 @@ export default function JobDetails(){
   // candidateIdToApply - in a real app you have auth; here we accept input
   const [candidateIdToApply, setCandidateIdToApply] = useState("");
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{ fetchJobAndApplicants(); }, [id]);
   const fetchJobAndApplicants = async ()=>{
     const r1 = await getJob(id); setJob(r1.data);

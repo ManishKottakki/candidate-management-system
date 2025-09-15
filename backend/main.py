@@ -37,7 +37,7 @@ class Candidate(BaseModel):
     current_status: str
     resume_link: str
 
-# --- Models ---
+# --- Job & Application Models ---
 class JobIn(BaseModel):
     title: str
     description: Optional[str] = None
@@ -59,6 +59,13 @@ class ApplicantOut(BaseModel):
     current_status: Optional[str] = None
     resume_link: Optional[str] = None
     applied_at: Optional[datetime] = None
+
+# Candidate Registration Model
+class CandidateRegister(BaseModel):
+    name: str
+    email: str
+    phone_number: str
+    resume_link: str
 
 # ------------------ Routes ------------------
 
@@ -223,3 +230,17 @@ def get_applicants_for_job(job_id: int):
         # r already has applied_at
         pass
     return rows
+
+# Candidate Registration
+@app.post("/api/register")
+def register_candidate(candidate: CandidateRegister):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(
+        "INSERT INTO candidates (name, email, phone_number, current_status, resume_link) VALUES (%s, %s, %s, %s, %s)",
+        (candidate.name, candidate.email, candidate.phone_number, "Registered", candidate.resume_link)
+    )
+    conn.commit()
+    new_id = cursor.lastrowid
+    conn.close()
+    return {"id": new_id, "message": "Candidate registered successfully"}

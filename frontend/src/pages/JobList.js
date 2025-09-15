@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { getJobs } from "../services/api";
 import { Link } from "react-router-dom";
-import JobForm from "./JobForm";
 
 export default function JobList(){
   const [jobs, setJobs] = useState([]);
