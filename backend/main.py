@@ -39,7 +39,7 @@ class Candidate(BaseModel):
     current_status: str
     resume_link: str
 
-# --- Job & Application Models ---
+# Job & Application Models
 class JobIn(BaseModel):
     title: str
     description: Optional[str] = None

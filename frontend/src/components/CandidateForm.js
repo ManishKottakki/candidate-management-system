@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { addCandidate, updateCandidate } from "../services/api";
 
-function CandidateForm({ onSubmit, editingCandidate }) {
-  const [formData, setFormData] = useState({
+export default function CandidateForm({ candidate, onCandidateSaved, onCancel }) {
+  const [form, setForm] = useState({
     name: "",
     email: "",
     phone_number: "",
@@ -9,75 +10,120 @@ function CandidateForm({ onSubmit, editingCandidate }) {
     resume_link: "",
   });
 
-  // Prefill form if editing
+  // When `candidate` prop changes (edit mode), populate form
   useEffect(() => {
-    if (editingCandidate) {
-      setFormData({
-        name: editingCandidate.name,
-        email: editingCandidate.email,
-        phone_number: editingCandidate.phone_number,
-        current_status: editingCandidate.current_status,
-        resume_link: editingCandidate.resume_link,
+    if (candidate) {
+      setForm({
+        name: candidate.name || "",
+        email: candidate.email || "",
+        phone_number: candidate.phone_number || "",
+        current_status: candidate.current_status || "",
+        resume_link: candidate.resume_link || "",
+      });
+    } else {
+      // reset to empty for add mode
+      setForm({
+        name: "",
+        email: "",
+        phone_number: "",
+        current_status: "",
+        resume_link: "",
       });
     }
-  }, [editingCandidate]);
+  }, [candidate]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
-    setFormData({ name: "", email: "", phone_number: "", current_status: "", resume_link: "" });
+    try {
+      if (candidate && candidate.id) {
+        // Update existing candidate
+        await updateCandidate(candidate.id, form);
+      } else {
+        // Add new candidate
+        await addCandidate(form);
+      }
+      if (onCandidateSaved) onCandidateSaved();
+    } catch (err) {
+      console.error("Error saving candidate:", err);
+      alert("Save failed");
+    }
   };
+
+  const isEdit = Boolean(candidate && candidate.id);
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h3>{editingCandidate ? "Edit Candidate" : "Add Candidate"}</h3>
-      <input
-        type="text"
-        name="name"
-        placeholder="Name"
-        value={formData.name}
-        onChange={handleChange}
-        required
-      />
-      <input
-        type="email"
-        name="email"
-        placeholder="Email"
-        value={formData.email}
-        onChange={handleChange}
-        required
-      />
-      <input
-        type="number"
-        name="phone_number"
-        placeholder="Phone Number"
-        value={formData.phone_number}
-        onChange={handleChange}
-        required
-      />
-      <input
-        type="text"
-        name="current_status"
-        placeholder="Current Status"
-        value={formData.current_status}
-        onChange={handleChange}
-        required
-      />
-      <input
-        type="text"
-        name="resume_link"
-        placeholder="Resume Link"
-        value={formData.resume_link}
-        onChange={handleChange}
-        required
-      />
-      <button type="submit">{editingCandidate ? "Update" : "Add"}</button>
-    </form>
+    <div style={{ border: "1px solid #ddd", padding: "12px", marginBottom: "12px" }}>
+      <h3>{isEdit ? "Edit Candidate" : "Add Candidate"}</h3>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <input
+            name="name"
+            placeholder="Name"
+            value={form.name}
+            onChange={handleChange}
+            required
+            style={{ width: "30%", marginBottom: "6px" }}
+          />
+        </div>
+        <div>
+          <input
+            name="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={handleChange}
+            required
+            style={{ width: "30%", marginBottom: "6px" }}
+          />
+        </div>
+        <div>
+          <input
+            name="phone_number"
+            placeholder="Phone Number"
+            value={form.phone_number}
+            onChange={handleChange}
+            style={{ width: "30%", marginBottom: "6px" }}
+          />
+        </div>
+        <div>
+          <input
+            name="current_status"
+            placeholder="Current Status"
+            value={form.current_status}
+            onChange={handleChange}
+            style={{ width: "30%", marginBottom: "6px" }}
+          />
+        </div>
+        <div>
+          <input
+            name="resume_link"
+            placeholder="Resume URL"
+            value={form.resume_link}
+            onChange={handleChange}
+            style={{ width: "30%", marginBottom: "6px" }}
+          />
+        </div>
+
+        <div>
+          <button type="submit">{isEdit ? "Update" : "Add"}</button>
+          {" "}
+          {isEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onCancel) onCancel();
+                else if (onCandidateSaved) onCandidateSaved(); // fallback
+              }}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      </form>
+    </div>
   );
 }
-
-export default CandidateForm;

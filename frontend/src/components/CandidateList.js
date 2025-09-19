@@ -1,71 +1,72 @@
 import React, { useEffect, useState } from "react";
 import CandidateForm from "./CandidateForm";
-
-const API_URL = "http://127.0.0.1:8000/api/candidates";
+import { useAuth } from "../context/AuthContext";
+import { getCandidates, deleteCandidate } from "../services/api";
 
 function CandidateList() {
   const [candidates, setCandidates] = useState([]);
   const [editingCandidate, setEditingCandidate] = useState(null);
-  const role = localStorage.getItem("role"); // e.g., "admin", "recruiter", "candidate"
+  const { user } = useAuth();
+  const role = user?.role; // get current user role
 
-  // Fetch candidates
+  // Fetch candidates (uses API instance that adds Authorization header)
   const fetchCandidates = async () => {
-    const response = await fetch(API_URL);
-    const data = await response.json();
-    setCandidates(data);
+    try {
+      const res = await getCandidates();
+      // res.data should be an array
+      setCandidates(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error fetching candidates:", err);
+      setCandidates([]);
+    }
   };
 
   useEffect(() => {
     fetchCandidates();
   }, []);
 
-  // Delete candidate
+  // Delete candidate (Admin only)
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this candidate?")) {
-    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-    fetchCandidates();
+    if (!window.confirm("Are you sure you want to delete this candidate?")) return;
+    try {
+      await deleteCandidate(id);
+      fetchCandidates();
+    } catch (err) {
+      console.error("Error deleting candidate:", err);
+      alert("Delete failed");
     }
   };
 
-  // Edit candidate
+  // Set a candidate for editing
   const handleEdit = (candidate) => {
     setEditingCandidate(candidate);
+    // CandidateForm will read this prop and populate fields
   };
 
-  // Handle form submit (for both add & edit)
-  const handleFormSubmit = async (candidate) => {
-    if (editingCandidate) {
-      // update
-      await fetch(`${API_URL}/${editingCandidate.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(candidate),
-      });
-    } else {
-      // add new
-      await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(candidate),
-      });
-    }
+  // Called when the form has successfully added/updated a candidate
+  const handleFormSaved = () => {
     setEditingCandidate(null);
     fetchCandidates();
+  };
+
+  // Cancel editing
+  const handleCancel = () => {
+    setEditingCandidate(null);
   };
 
   return (
     <div>
       <h2>Candidate List</h2>
-      {/* Form for Adding/Editing */}
+
+      {/* Show form only to admin/recruiter */}
       {(role === "admin" || role === "recruiter") && (
         <CandidateForm
           candidate={editingCandidate}
-          onCandidateSaved={() => {
-            setEditingCandidate(null);
-            fetchCandidates();
-          }}
+          onCandidateSaved={handleFormSaved}
+          onCancel={handleCancel}
         />
       )}
+
       <table border="1" style={{ width: "100%", marginTop: "20px" }}>
         <thead>
           <tr>
@@ -79,24 +80,38 @@ function CandidateList() {
           </tr>
         </thead>
         <tbody>
-          {candidates.map((c) => (
-            <tr key={c.id}>
-              <td>{c.id}</td>
-              <td>{c.name}</td>
-              <td>{c.email}</td>
-              <td>{c.phone_number}</td>
-              <td>{c.current_status}</td>
-              <td>{c.resume_link}</td>
-              <td>
-                {(role === "admin" || role === "recruiter") && (
-                  <button onClick={() => setEditingCandidate(c)}>Edit</button>
-                )}
-                 {(role === "admin") && (
-                  <button onClick={() => handleDelete(c.id)}>Delete</button>
-                )}
-              </td>
+          {Array.isArray(candidates) && candidates.length > 0 ? (
+            candidates.map((c) => (
+              <tr key={c.id}>
+                <td>{c.id}</td>
+                <td>{c.name}</td>
+                <td>{c.email}</td>
+                <td>{c.phone_number}</td>
+                <td>{c.current_status}</td>
+                <td>
+                  {c.resume_link ? (
+                    <a href={c.resume_link} target="_blank" rel="noreferrer">
+                      Resume
+                    </a>
+                  ) : (
+                    "-"
+                  )}
+                </td>
+                <td>
+                  {(role === "admin" || role === "recruiter") && (
+                    <button onClick={() => handleEdit(c)}>Edit</button>
+                  )}
+                  {role === "admin" && (
+                    <button onClick={() => handleDelete(c.id)}>Delete</button>
+                  )}
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="7">No candidates found.</td>
             </tr>
-          ))}
+          )}
         </tbody>
       </table>
     </div>

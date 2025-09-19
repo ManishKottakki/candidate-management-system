@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { getJobs, deletejob } from "../services/api";
+import { getJobs, deleteJob } from "../services/api";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function JobList() {
   const [jobs, setJobs] = useState([]);
   const navigate = useNavigate();
 
-  const role = localStorage.getItem("role");       // e.g., "admin", "recruiter", "candidate"
-  const userId = Number(localStorage.getItem("id")); // recruiter_id for comparison
+  const { user } = useAuth();
+  const role = user?.role;    // get current user role
+  const userId = user?.id;    // get current user ID
 
+  // Fetch jobs on component mount
   useEffect(() => {
     fetchJobs();
   }, []);
@@ -18,6 +21,7 @@ export default function JobList() {
     setJobs(res.data);
   };
 
+  // Handle job deletion
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to delete this job?")) {
       await deleteJob(id);

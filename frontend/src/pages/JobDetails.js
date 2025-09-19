@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { getJob, getApplicantsForJob, applyToJob } from "../services/api";
 import { useParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function JobDetails(){
   const { id } = useParams();
+  const { user } = useAuth();
+  const role = user?.role;
   const [job, setJob] = useState(null);
   const [applicants, setApplicants] = useState([]);
   // candidateIdToApply - in a real app you have auth; here we accept input
