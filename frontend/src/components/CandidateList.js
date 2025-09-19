@@ -6,6 +6,7 @@ const API_URL = "http://127.0.0.1:8000/api/candidates";
 function CandidateList() {
   const [candidates, setCandidates] = useState([]);
   const [editingCandidate, setEditingCandidate] = useState(null);
+  const role = localStorage.getItem("role"); // e.g., "admin", "recruiter", "candidate"
 
   // Fetch candidates
   const fetchCandidates = async () => {
@@ -20,8 +21,10 @@ function CandidateList() {
 
   // Delete candidate
   const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this candidate?")) {
     await fetch(`${API_URL}/${id}`, { method: "DELETE" });
     fetchCandidates();
+    }
   };
 
   // Edit candidate
@@ -53,7 +56,16 @@ function CandidateList() {
   return (
     <div>
       <h2>Candidate List</h2>
-      <CandidateForm onSubmit={handleFormSubmit} editingCandidate={editingCandidate} />
+      {/* Form for Adding/Editing */}
+      {(role === "admin" || role === "recruiter") && (
+        <CandidateForm
+          candidate={editingCandidate}
+          onCandidateSaved={() => {
+            setEditingCandidate(null);
+            fetchCandidates();
+          }}
+        />
+      )}
       <table border="1" style={{ width: "100%", marginTop: "20px" }}>
         <thead>
           <tr>
@@ -76,8 +88,12 @@ function CandidateList() {
               <td>{c.current_status}</td>
               <td>{c.resume_link}</td>
               <td>
-                <button onClick={() => handleEdit(c)}>Edit</button>
-                <button onClick={() => handleDelete(c.id)}>Delete</button>
+                {(role === "admin" || role === "recruiter") && (
+                  <button onClick={() => setEditingCandidate(c)}>Edit</button>
+                )}
+                 {(role === "admin") && (
+                  <button onClick={() => handleDelete(c.id)}>Delete</button>
+                )}
               </td>
             </tr>
           ))}

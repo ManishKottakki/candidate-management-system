@@ -39,16 +39,24 @@ export default function JobDetails(){
       <button onClick={handleApply}>Apply</button>
 
       <h3>Applicants</h3>
-      {applicants.length === 0 ? (
-        <p>No applicants yet.</p>
+      {role === "candidate" ? (
+        applicants.length === 0 ? (
+          <p>No applicants yet.</p>
+        ) : (
+          <p>Total Applicants: {applicants.length}</p>
+        )
       ) : (
-        <ul>
-          {applicants.map(a => (
-            <li key={a.id}>
-              {a.name} ({a.email}) — applied at {a.applied_at}
-            </li>
-          ))}
-        </ul>
+        applicants.length === 0 ? (
+          <p>No applicants yet.</p>
+        ) : (
+          <ul>
+            {applicants.map(a => (
+              <li key={a.id}>
+                {a.name} ({a.email}) — applied at {a.applied_at}
+              </li>
+            ))}
+          </ul>
+        )
       )}
     </div>
   );

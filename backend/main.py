@@ -1,10 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 import mysql.connector
 from pydantic import BaseModel
 import getpass
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
+from .auth import (authenticate_user, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_password_hash, require_roles, get_user_from_token, )
 
 app = FastAPI()
 
@@ -69,15 +71,44 @@ class CandidateRegister(BaseModel):
 
 # ------------------ Routes ------------------
 
-# Get all candidates
+# AUTH ROUTES
+@app.post("/api/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    # OAuth2PasswordRequestForm expects 'username' and 'password' fields (form-encoded)
+    user = authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    token = create_access_token(
+        data={"user_id": user["id"], "role": user["role"]},
+        expires_delta=access_token_expires
+    )
+    return {"access_token": token, "token_type": "bearer", "role": user["role"], "user_id": user["id"]}
+
+# Get candidates (listing with role-based access)
 @app.get("/api/candidates")
-def get_candidates():
+def get_candidates(user=Depends(get_user_from_token)):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM candidates")
-    rows = cursor.fetchall()
+
+    if user["role"] in ["admin", "recruiter"]:
+        cursor.execute("SELECT * FROM candidates")
+    elif user["role"] == "manager":
+        sql = """
+        SELECT c.*
+        FROM candidates c
+        JOIN applications a ON c.id = a.candidate_id
+        JOIN jobs j ON a.job_id = j.id
+        WHERE j.manager_id = %s
+        """
+        cursor.execute(sql, (user["id"],))
+    else:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    candidates = cursor.fetchall()
+    cursor.close()
     conn.close()
-    return rows
+    return candidates
 
 # Add new candidate
 @app.post("/api/candidates")
@@ -107,7 +138,7 @@ def update_candidate(candidate_id: int, candidate: Candidate):
 
 # Delete candidate
 @app.delete("/api/candidates/{candidate_id}")
-def delete_candidate(candidate_id: int):
+def delete_candidate(candidate_id: int, user=Depends(require_roles("admin"))):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM candidates WHERE id=%s", (candidate_id,))
@@ -143,7 +174,7 @@ def get_job(job_id: int):
 
 # POST create job
 @app.post("/api/jobs", response_model=JobOut)
-def create_job(job: JobIn):
+def create_job(job: JobIn, user=Depends(require_roles("admin", "recruiter"))):
     conn = get_db_connection()
     cursor = conn.cursor()
     sql = "INSERT INTO jobs (title, description, required_skills, recruiter_id) VALUES (%s, %s, %s, %s)"
@@ -168,7 +199,7 @@ def update_job(job_id: int, job: JobIn):
 
 # DELETE job
 @app.delete("/api/jobs/{job_id}")
-def delete_job(job_id: int):
+def delete_job(job_id: int, user=Depends(require_roles("admin"))):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM jobs WHERE id=%s", (job_id,))
@@ -210,26 +241,41 @@ def apply_to_job(job_id: int, application: ApplicationIn):
     return {"message": "Applied successfully", "candidate_id": candidate_id, "job_id": job_id}
 
 # Get all candidates who applied for a job (JOIN)
-@app.get("/api/jobs/{job_id}/applicants", response_model=List[ApplicantOut])
-def get_applicants_for_job(job_id: int):
+@app.get("/api/jobs/{job_id}/applicants")
+def get_applicants(job_id: int, user=Depends(get_user_from_token)):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    sql = """
-        SELECT c.id, c.name, c.email, c.phone_number, c.current_status, c.resume_link, a.applied_at
-        FROM applications a
-        JOIN candidates c ON a.candidate_id = c.id
+
+    if user["role"] in ["admin", "recruiter"]:
+        sql = """
+        SELECT c.*, a.applied_at
+        FROM candidates c
+        JOIN applications a ON c.id = a.candidate_id
         WHERE a.job_id = %s
-        ORDER BY a.applied_at DESC
-    """
-    cursor.execute(sql, (job_id,))
-    rows = cursor.fetchall()
+        """
+        cursor.execute(sql, (job_id,))
+    elif user["role"] == "manager":
+        sql = """
+        SELECT c.*, a.applied_at
+        FROM candidates c
+        JOIN applications a ON c.id = a.candidate_id
+        JOIN jobs j ON a.job_id = j.id
+        WHERE a.job_id = %s AND j.manager_id = %s
+        """
+        cursor.execute(sql, (job_id, user["id"]))
+    elif user["role"] == "candidate":
+        cursor.execute("SELECT COUNT(*) as total FROM applications WHERE job_id=%s", (job_id,))
+        total = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return {"total_applicants": total["total"]}
+    else:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    result = cursor.fetchall()
     cursor.close()
     conn.close()
-    # map applied_at key name to response model field applied_at
-    for r in rows:
-        # r already has applied_at
-        pass
-    return rows
+    return result
 
 # Candidate Registration
 @app.post("/api/register")
