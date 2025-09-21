@@ -44,7 +44,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 def authenticate_user(email: str, password: str):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT id, email, password_hash, role FROM users WHERE email=%s", (email,))
+    cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
     user = cursor.fetchone()
     cursor.close()
     conn.close()
@@ -52,7 +52,7 @@ def authenticate_user(email: str, password: str):
         return None
     if not verify_password(password, user["password_hash"]):
         return None
-    return user
+    return user # contains id, email, role
 
 def get_user_from_token(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(

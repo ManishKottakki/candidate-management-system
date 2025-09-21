@@ -13,7 +13,7 @@ function Navbar() {
   const { user, logout } = useContext(AuthContext);
   return (
     <nav>
-      <Link to="/">Candidates</Link> | <Link to="/jobs">Jobs</Link> | <Link to="/register">Register</Link> |{" "}
+      <Link to="/">Candidates</Link> | <Link to="/jobs">Jobs</Link> |{" "}
       {user ? (
         <>
           <span>Logged in as {user.role}</span>

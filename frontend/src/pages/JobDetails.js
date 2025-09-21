@@ -16,37 +16,71 @@ export default function JobDetails(){
   useEffect(()=>{ fetchJobAndApplicants(); }, [id]);
   const fetchJobAndApplicants = async ()=>{
     const r1 = await getJob(id); setJob(r1.data);
-    const r2 = await getApplicantsForJob(id); setApplicants(r2.data);
+    const r2 = await getApplicantsForJob(id);
+    
+    if (role === "candidate") {
+      // backend returns { total_applicants: n } for candidates
+      setApplicants(r2.data.total_applicants);
+    } else {
+      // backend returns an array of applicants for recruiters
+      setApplicants(r2.data);
+    }
   };
 
   const handleApply = async () => {
-  if (!candidateIdToApply) {
-    alert("Enter candidate id to apply");
-    return;
+  let candidateId;
+
+  if (role === "candidate") {
+    // ✅ Use candidate_id from AuthContext (set during login)
+    candidateId = user?.candidate_id;
+    if (!candidateId) {
+      alert("Could not detect your candidate ID. Please log in again.");
+      return;
+    }
+  } else {
+    // Admin/Recruiter/Manager flow: requires candidateIdToApply input
+    if (!candidateIdToApply) {
+      alert("Enter candidate ID to apply");
+      return;
+    }
+    candidateId = Number(candidateIdToApply);
   }
-  await applyToJob(id, Number(candidateIdToApply));
-  alert("Applied!");
-  setCandidateIdToApply(""); // clear the input
-  fetchJobAndApplicants(); // refresh applicants list
+
+  try {
+    await applyToJob(id, candidateId);
+    alert("Applied!");
+    setCandidateIdToApply(""); // clear input for non-candidates
+    fetchJobAndApplicants();   // refresh applicant list
+  } catch (err) {
+    console.error("Error applying:", err);
+    alert("Error applying: " + (err.response?.data?.detail || err.message));
+  }
 };
 
   if(!job) return <div>Loading...</div>;
   return (
-    <div>
+    <div style={{ border: "1px solid #ddd", padding: "12px", marginBottom: "12px" }}>
       <h2>{job.title}</h2>
       <p>{job.description}</p>
       <p><b>Skills:</b> {job.required_skills}</p>
 
       <h3>Apply</h3>
-      <input placeholder="Candidate ID" value={candidateIdToApply} onChange={e=>setCandidateIdToApply(e.target.value)} />
+      {role !== "candidate" && (
+        <input
+          placeholder="Candidate ID"
+          value={candidateIdToApply}
+          onChange={(e) => setCandidateIdToApply(e.target.value)}
+        />
+      )}
+      {" "}
       <button onClick={handleApply}>Apply</button>
 
       <h3>Applicants</h3>
       {role === "candidate" ? (
-        applicants.length === 0 ? (
+        applicants === 0 ? (
           <p>No applicants yet.</p>
         ) : (
-          <p>Total Applicants: {applicants.length}</p>
+          <p>Total Applicants: {applicants}</p>
         )
       ) : (
         applicants.length === 0 ? (

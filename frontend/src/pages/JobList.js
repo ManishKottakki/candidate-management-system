@@ -30,7 +30,7 @@ export default function JobList() {
   };
 
   return (
-    <div>
+    <div style={{ border: "1px solid #ddd", padding: "12px", marginBottom: "12px" }}>
       <h2>Jobs</h2>
       {role === "admin" || role === "recruiter" ? (
         <Link to="/jobs/new">Post New Job</Link>

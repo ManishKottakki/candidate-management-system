@@ -102,60 +102,70 @@ export default function JobEdit({ onJobSaved, onCancel: parentOnCancel }) {
   if (loading) return <div>Loading job...</div>;
 
   return (
-    <div style={{ maxWidth: 700 }}>
+    <div style={{ border: "1px solid #ddd", padding: "12px", marginBottom: "12px" }}>
       <h2>{isEdit ? "Edit Job" : "Post New Job"}</h2>
       <form onSubmit={handleSubmit}>
         <div>
           <label>Title</label>
-          <input
-            name="title"
-            value={form.title}
-            onChange={handleChange}
-            required
-            style={{ width: "100%", marginBottom: 8 }}
-          />
+          <div>
+            <input
+              name="title"
+              value={form.title}
+              onChange={handleChange}
+              required
+              style={{ width: "30%", marginBottom: "6px" }}
+            />
+          </div>
         </div>
 
         <div>
           <label>Description</label>
-          <textarea
-            name="description"
-            value={form.description}
-            onChange={handleChange}
-            required
-            rows={4}
-            style={{ width: "100%", marginBottom: 8 }}
-          />
+          <div>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              required
+              rows={4}
+              style={{ width: "30%", marginBottom: "6px" }}
+            />
+          </div>
         </div>
 
         <div>
           <label>Required Skills</label>
-          <input
-            name="required_skills"
-            value={form.required_skills}
-            onChange={handleChange}
-            style={{ width: "100%", marginBottom: 8 }}
-          />
+          <div>
+            <input
+              name="required_skills"
+              value={form.required_skills}
+              onChange={handleChange}
+              style={{ width: "30%", marginBottom: "6px" }}
+            />
+          </div>
         </div>
 
         <div>
           <label>Manager ID (optional)</label>
-          <input
-            name="manager_id"
-            value={form.manager_id}
-            onChange={handleChange}
-            style={{ width: "100%", marginBottom: 8 }}
-          />
+          <div>
+            <input
+              name="manager_id"
+              value={form.manager_id}
+              onChange={handleChange}
+              style={{ width: "30%", marginBottom: "6px" }}
+            />
+          </div>
         </div>
 
         <div>
           <label>Recruiter ID (optional)</label>
-          <input
-            name="recruiter_id"
-            value={form.recruiter_id}
-            onChange={handleChange}
-            style={{ width: "100%", marginBottom: 8 }}
-          />
+          <div>
+            <input
+              name="recruiter_id"
+              value={form.recruiter_id}
+              onChange={handleChange}
+              style={{ width: "30%", marginBottom: "6px" }}
+            />
+          </div>
         </div>
 
         <div style={{ marginTop: 12 }}>

@@ -1,10 +1,11 @@
 import React, { useState, useContext } from "react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
+import "./../styles/Auth.css"
 
 export default function Login() {
-  const { login } = useContext(AuthContext);
+  const { login, user } = useContext(AuthContext);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
@@ -22,9 +23,7 @@ export default function Login() {
 
     const jwt = res.data.access_token;
 
-    // decode JWT payload
-    const payload = JSON.parse(atob(jwt.split(".")[1]));
-    login({ id: payload.sub, email: payload.email, role: payload.role }, jwt);
+    login({ id: res.data.user_id, email: res.data.email, role: res.data.role, candidate_id: res.data.candidate_id || null, }, jwt);
 
     navigate("/"); // go home after login
   } catch (err) {
@@ -33,9 +32,9 @@ export default function Login() {
 };
 
   return (
-    <div>
-      <h2>Login</h2>
-      <form onSubmit={handleSubmit}>
+    <div className="center-container">
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <h2>Login</h2>
         <input
           type="email"
           placeholder="Email"
@@ -51,6 +50,13 @@ export default function Login() {
         />
         <br />
         <button type="submit">Login</button>
+
+        {/* Show Register link only when not logged in */}
+        {!user && (
+          <p style={{ marginTop: "10px" }}>
+            New Candidate? <Link to="/register">Register</Link>
+          </p>
+        )}
       </form>
     </div>
   );

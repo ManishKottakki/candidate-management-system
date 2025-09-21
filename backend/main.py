@@ -68,22 +68,50 @@ class CandidateRegister(BaseModel):
     email: str
     phone_number: str
     resume_link: str
+    password: str
+    confirm_password: str
 
 # ------------------ Routes ------------------
 
 # AUTH ROUTES
 @app.post("/api/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    # OAuth2PasswordRequestForm expects 'username' and 'password' fields (form-encoded)
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Incorrect username or password")
+
+    # connect to DB
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    candidate_id = None
+    if user["role"] == "candidate":
+        cursor.execute("SELECT id FROM candidates WHERE user_id=%s", (user["id"],))
+        row = cursor.fetchone()
+        if row:
+            candidate_id = row["id"]
+
+    cursor.close()
+    conn.close()
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = create_access_token(
-        data={"user_id": user["id"], "role": user["role"]},
+        data={
+            "user_id": user["id"],
+            "role": user["role"],
+            "candidate_id": candidate_id,
+        },
         expires_delta=access_token_expires
     )
-    return {"access_token": token, "token_type": "bearer", "role": user["role"], "user_id": user["id"]}
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "role": user["role"],
+        "user_id": user["id"],
+        "email": user["email"],
+        "candidate_id": candidate_id
+    }
 
 # Get candidates (listing with role-based access)
 @app.get("/api/candidates")
@@ -212,30 +240,47 @@ def delete_job(job_id: int, user=Depends(require_roles("admin"))):
 
 # Candidate applies to a job
 @app.post("/api/jobs/{job_id}/apply")
-def apply_to_job(job_id: int, application: ApplicationIn):
+def apply_to_job(job_id: int, application: ApplicationIn, user=Depends(get_user_from_token)):
     candidate_id = application.candidate_id
+
     conn = get_db_connection()
-    cursor = conn.cursor()
-    # Optional: check job exists
+    cursor = conn.cursor(dictionary=True)
+
+    if user["role"] == "candidate":
+        # Force match candidate by email from users table
+        cursor.execute("SELECT id FROM candidates WHERE email=%s", (user["email"],))
+        candidate = cursor.fetchone()
+        if not candidate:
+            cursor.close()
+            conn.close()
+            raise HTTPException(status_code=404, detail="Candidate not found")
+        candidate_id = candidate["id"]
+
+    # Check job exists
     cursor.execute("SELECT id FROM jobs WHERE id=%s", (job_id,))
     if not cursor.fetchone():
         cursor.close()
         conn.close()
         raise HTTPException(status_code=404, detail="Job not found")
-    # Optional: check candidate exists
+
+    # Check candidate exists
     cursor.execute("SELECT id FROM candidates WHERE id=%s", (candidate_id,))
     if not cursor.fetchone():
         cursor.close()
         conn.close()
         raise HTTPException(status_code=404, detail="Candidate not found")
+
     try:
-        cursor.execute("INSERT INTO applications (candidate_id, job_id) VALUES (%s, %s)", (candidate_id, job_id))
+        cursor.execute(
+            "INSERT INTO applications (candidate_id, job_id) VALUES (%s, %s)",
+            (candidate_id, job_id),
+        )
         conn.commit()
     except Exception as e:
-        # likely unique constraint violation (already applied)
         cursor.close()
         conn.close()
         raise HTTPException(status_code=400, detail=str(e))
+
     cursor.close()
     conn.close()
     return {"message": "Applied successfully", "candidate_id": candidate_id, "job_id": job_id}
@@ -280,13 +325,32 @@ def get_applicants(job_id: int, user=Depends(get_user_from_token)):
 # Candidate Registration
 @app.post("/api/register")
 def register_candidate(candidate: CandidateRegister):
+    if candidate.password != candidate.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
+
+    # Insert into users table first
+    password_hash = get_password_hash(candidate.password)
     cursor.execute(
-        "INSERT INTO candidates (name, email, phone_number, current_status, resume_link) VALUES (%s, %s, %s, %s, %s)",
-        (candidate.name, candidate.email, candidate.phone_number, "Registered", candidate.resume_link)
+        "INSERT INTO users (email, password_hash, role) VALUES (%s, %s, %s)",
+        (candidate.email, password_hash, "candidate"),
     )
+    user_id = cursor.lastrowid
+
+    # Insert into candidates table with reference to user_id
+    cursor.execute(
+        """
+        INSERT INTO candidates (name, email, phone_number, current_status, resume_link, user_id)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        """,
+        (candidate.name, candidate.email, candidate.phone_number, "Registered", candidate.resume_link, user_id)
+    )
+    candidate_id = cursor.lastrowid
+
     conn.commit()
-    new_id = cursor.lastrowid
+    cursor.close()
     conn.close()
-    return {"id": new_id, "message": "Candidate registered successfully"}
+
+    return {"id": candidate_id, "user_id": user_id, "message": "Candidate registered successfully"}
